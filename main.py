@@ -54,7 +54,7 @@ logger = logging.getLogger("agent")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
 
-# Improve GROQ API key validation to fail if key is not set
+# Improve GROQ API key validation
 if not GROQ_API_KEY:
     logger.warning("GROQ_API_KEY not set. Set it as an environment variable before running.")
 
