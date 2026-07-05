@@ -63,7 +63,7 @@ client = Groq(api_key=GROQ_API_KEY)
 OUTPUT_DIR = "generated_docs"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-MAX_LLM_RETRIES = 3
+MAX_LLM_RETRIES = 3  # Retry LLM calls 3 times
 
 
 # --------------------------------------------------------------------------
