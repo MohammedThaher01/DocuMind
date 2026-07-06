@@ -60,7 +60,7 @@ if not GROQ_API_KEY:
 
 client = Groq(api_key=GROQ_API_KEY)
 
-OUTPUT_DIR = "generated_docs"
+OUTPUT_DIR = "generated_docs"  # Directory for generated documents
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 MAX_LLM_RETRIES = 3  # Retry LLM calls 3 times
