@@ -166,7 +166,7 @@ def node_classify_and_plan(state: AgentState) -> AgentState:
     state["task_list"] = task_list
     state["sections"] = [{"heading": h, "content": ""} for h in plan.get("sections", fallback["sections"])]
     state["_title"] = plan.get("title", "Generated Business Document")  # type: ignore
-    logger.info(f"Planned doc_type={state['doc_type']} sections={[s['heading'] for s in state['sections']]}")
+    logger.info(f"Planned doc_type={state['doc_type']}")
     return state
 
 
