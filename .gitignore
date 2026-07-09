@@ -23,4 +23,7 @@ generated_docs/
 *.swp
 *.swo
 *~
+
+# Helper scripts
+make_commits.py
 .DS_Store
