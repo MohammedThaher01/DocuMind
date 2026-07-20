@@ -30,17 +30,20 @@ import os
 import json
 import uuid
 import logging
+import asyncio
+import threading
 from datetime import datetime
-from typing import TypedDict, List, Optional
+from typing import TypedDict, List, Optional, Dict, Any
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, RedirectResponse, RedirectResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 
 from langgraph.graph import StateGraph, END
 from groq import Groq
 from docx import Document
-from docx.shared import Pt, Inches, RGBColor
+from docx.shared import Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
 
@@ -64,6 +67,64 @@ OUTPUT_DIR = "generated_docs"  # Directory for generated documents
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 MAX_LLM_RETRIES = 3  # Retry LLM calls 3 times
+
+# --------------------------------------------------------------------------
+# In-memory job store + streaming events (safe for single-process deployment)
+# --------------------------------------------------------------------------
+
+class JobStatus:
+    QUEUED = "queued"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+jobs_lock = threading.Lock()
+jobs: Dict[str, Dict[str, Any]] = {}
+MAX_JOBS = 200
+
+def _prune_jobs_locked():
+    while len(jobs) > MAX_JOBS:
+        oldest = min(jobs.keys(), key=lambda k: jobs[k].get("created_at", 0))
+        del jobs[oldest]
+
+def create_job(request_text: str) -> str:
+    job_id = uuid.uuid4().hex
+    with jobs_lock:
+        _prune_jobs_locked()
+        jobs[job_id] = {
+            "job_id": job_id,
+            "status": JobStatus.QUEUED,
+            "events": [],  # list of {type, ts, ...}
+            "request": request_text,
+            "result": None,  # AgentResponse dict on completion
+            "error": None,
+            "created_at": datetime.now().timestamp(),
+        }
+    return job_id
+
+def emit_event(job_id: str, event: Dict[str, Any]):
+    event.setdefault("ts", datetime.now().isoformat() + "Z")
+    with jobs_lock:
+        j = jobs.get(job_id)
+        if not j:
+            return
+        j["events"].append(event)
+
+def set_job_status(job_id: str, status: str, result=None, error=None):
+    with jobs_lock:
+        j = jobs.get(job_id)
+        if not j:
+            return
+        j["status"] = status
+        if result is not None:
+            j["result"] = result
+        if error is not None:
+            j["error"] = error
+
+def get_job(job_id: str) -> Optional[Dict[str, Any]]:
+    with jobs_lock:
+        j = jobs.get(job_id)
+        return dict(j) if j else None
 
 
 # --------------------------------------------------------------------------
@@ -172,8 +233,8 @@ def node_classify_and_plan(state: AgentState) -> AgentState:
 
 def node_execute_steps(state: AgentState) -> AgentState:
     """Executes each planned section: one focused LLM call per section so
-    each piece of content stays grounded and on-topic (mock data allowed
-    per assignment rules where real data isn't available)."""
+    each piece of content stays grounded and on-topic (use realistic
+    mock data/numbers/names where specifics aren't available)."""
     assumptions_text = "\n".join(f"- {a}" for a in state["assumptions"]) or "None"
     drafted = []
     for sec in state["sections"]:
@@ -346,10 +407,107 @@ agent_graph = build_graph()
 
 
 # --------------------------------------------------------------------------
+# Background runner: uses LangGraph .stream() to emit per-node progress
+# --------------------------------------------------------------------------
+
+def _build_initial_state(request_text: str) -> AgentState:
+    return {
+        "request": request_text,
+        "doc_type": "",
+        "assumptions": [],
+        "task_list": [],
+        "sections": [],
+        "draft_sections": [],
+        "critique": {},
+        "revised": False,
+        "file_path": "",
+        "error": None,
+    }
+
+def _build_response_from_state(state: AgentState) -> dict:
+    fname = os.path.basename(state["file_path"]) if state.get("file_path") else ""
+    return {
+        "message": f"Successfully generated a {state['doc_type'].replace('_', ' ')} document.",
+        "doc_type": state["doc_type"],
+        "assumptions": state["assumptions"],
+        "task_list": state["task_list"],
+        "revised": state["revised"],
+        "download_url": f"/download/{fname}" if fname else "",
+    }
+
+def run_agent_background(job_id: str, request_text: str):
+    """Blocking runner, intended to be called in a background thread."""
+    set_job_status(job_id, JobStatus.RUNNING)
+    emit_event(job_id, {"type": "start", "message": "Agent started"})
+    final_state = None
+    try:
+        initial = _build_initial_state(request_text)
+        # LangGraph stream yields dicts of {node_name: partial_state} after each node
+        for step_output in agent_graph.stream(initial):
+            node_name = next(iter(step_output.keys()))
+            partial = step_output[node_name]
+            emit_event(job_id, {
+                "type": "node",
+                "node": node_name,
+                "message": f"Completed step: {node_name}",
+            })
+            # Task list updates: propagate so UI can render progress checklist
+            if partial.get("task_list"):
+                emit_event(job_id, {
+                    "type": "task_list",
+                    "task_list": partial["task_list"],
+                })
+            if node_name == "plan":
+                emit_event(job_id, {
+                    "type": "plan",
+                    "doc_type": partial.get("doc_type", ""),
+                    "assumptions": partial.get("assumptions", []),
+                    "sections": [s.get("heading", "") for s in partial.get("sections", [])],
+                })
+            if node_name == "reflect" and partial.get("critique"):
+                emit_event(job_id, {
+                    "type": "critique",
+                    "critique": partial["critique"],
+                })
+            if node_name == "export" and partial.get("file_path"):
+                emit_event(job_id, {
+                    "type": "export",
+                    "file_path": partial["file_path"],
+                })
+            final_state = partial
+        # Final state from stream is the last emitted partial
+        if not final_state or not final_state.get("file_path"):
+            # Fallback: one more invoke to be safe
+            final_state = agent_graph.invoke(initial)
+        result = _build_response_from_state(final_state)
+        emit_event(job_id, {"type": "done", "result": result})
+        set_job_status(job_id, JobStatus.COMPLETED, result=result)
+    except Exception as e:
+        logger.exception("Agent execution failed for job %s", job_id)
+        err_msg = f"Agent execution failed: {str(e)}"
+        emit_event(job_id, {"type": "error", "error": err_msg})
+        set_job_status(job_id, JobStatus.FAILED, error=err_msg)
+
+
+# --------------------------------------------------------------------------
 # FastAPI app
 # --------------------------------------------------------------------------
 
-app = FastAPI(title="Autonomous Document Agent", version="1.0.0")
+app = FastAPI(title="Autonomous Document Agent", version="2.0.0")
+
+# CORS: allow local Vite dev server + any production frontend domain you deploy to
+ALLOWED_ORIGINS = os.environ.get(
+    "ALLOWED_ORIGINS",
+    "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000"
+).split(",")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in ALLOWED_ORIGINS if o.strip()] + ["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class AgentRequest(BaseModel):
@@ -372,34 +530,84 @@ class AgentResponse(BaseModel):
     download_url: str
 
 
-@app.post("/agent", response_model=AgentResponse)
+class AgentAcceptedResponse(BaseModel):
+    job_id: str
+    status_endpoint: str
+    stream_endpoint: str
+
+
+@app.post("/agent", response_model=AgentAcceptedResponse)
+def run_agent_async(payload: AgentRequest):
+    """Kicks off generation in the background. Returns a job_id that the
+    frontend can use with /agent/{id}/stream (SSE) or /agent/{id} (poll)."""
+    job_id = create_job(payload.request)
+    emit_event(job_id, {"type": "queued", "message": "Job queued"})
+    t = threading.Thread(target=run_agent_background, args=(job_id, payload.request), daemon=True)
+    t.start()
+    return AgentAcceptedResponse(
+        job_id=job_id,
+        status_endpoint=f"/agent/{job_id}",
+        stream_endpoint=f"/agent/{job_id}/stream",
+    )
+
+
+@app.post("/agent/sync", response_model=AgentResponse)
 def run_agent(payload: AgentRequest):
-    initial_state: AgentState = {
-        "request": payload.request,
-        "doc_type": "",
-        "assumptions": [],
-        "task_list": [],
-        "sections": [],
-        "draft_sections": [],
-        "critique": {},
-        "revised": False,
-        "file_path": "",
-        "error": None,
-    }
+    """Original synchronous blocking endpoint — kept for backward compat / curl tests."""
+    initial_state = _build_initial_state(payload.request)
     try:
         final_state = agent_graph.invoke(initial_state)
     except Exception as e:
         logger.exception("Agent execution failed")
         raise HTTPException(status_code=500, detail=f"Agent execution failed: {str(e)}")
+    return AgentResponse(**_build_response_from_state(final_state))
 
-    fname = os.path.basename(final_state["file_path"])
-    return AgentResponse(
-        message=f"Successfully generated a {final_state['doc_type'].replace('_', ' ')} document.",
-        doc_type=final_state["doc_type"],
-        assumptions=final_state["assumptions"],
-        task_list=final_state["task_list"],
-        revised=final_state["revised"],
-        download_url=f"/download/{fname}",
+
+@app.get("/agent/{job_id}")
+def get_job_status(job_id: str):
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
+
+
+async def _event_generator(job_id: str):
+    """SSE generator: sends historical events first, then polls for new ones
+    until the job reaches a terminal state or times out."""
+    job = get_job(job_id)
+    if not job:
+        yield f"event: error\ndata: {json.dumps({'error': 'Job not found'})}\n\n"
+        return
+
+    last_sent = 0
+    max_polls = 600  # ~10 min if 1s per poll
+    polls = 0
+    while polls < max_polls:
+        job = get_job(job_id)
+        if not job:
+            break
+        events = job.get("events", [])
+        while last_sent < len(events):
+            ev = events[last_sent]
+            last_sent += 1
+            yield f"event: {ev['type']}\ndata: {json.dumps(ev)}\n\n"
+        if job["status"] in (JobStatus.COMPLETED, JobStatus.FAILED):
+            break
+        polls += 1
+        await asyncio.sleep(1.0)
+
+
+@app.get("/agent/{job_id}/stream")
+async def stream_job(job_id: str):
+    """Server-Sent Events stream — use with browser EventSource API."""
+    return StreamingResponse(
+        _event_generator(job_id),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )
 
 
