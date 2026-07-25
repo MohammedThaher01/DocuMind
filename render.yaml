@@ -1,0 +1,48 @@
+# render.com Blueprint — deploy with "Blueprints" or use as a reference for
+# a manual Web Service + Static Site setup.
+#
+# Docs: https://render.com/docs/infrastructure-as-code
+#
+# 1. Set GROQ_API_KEY in the Render dashboard / CLI as an environment secret.
+# 2. (Optional) Set ALLOWED_ORIGINS=https://your-frontend.onrender.com,https://your-custom-domain.com
+# 3. Connect your repo. Render will read this file and create the two services below.
+
+services:
+  - type: web
+    name: documind-backend
+    runtime: docker
+    repo: https://github.com/MohammedThaher01/documind   # <-- replace with your actual repo
+    branch: main
+    rootDir: .                                    # Dockerfile lives at repo root
+    dockerCommand: ""                             # uses Dockerfile CMD
+    plan: starter                                 # upgrade to standard for production
+    healthCheckPath: /health
+    autoDeploy: yes
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false                               # <-- set this value in Render UI
+      - key: GROQ_MODEL
+        value: "llama-3.3-70b-versatile"
+      - key: ALLOWED_ORIGINS
+        value: "https://documind-frontend.onrender.com"   # <-- update after frontend is created; comma-separated
+    # Optional: persistent disk so generated .docx files survive deploys.
+    # Without a disk, docs live only in-container until restart.
+    # disk:
+    #   name: documind-docs
+    #   mountPath: /app/generated_docs
+    #   sizeGB: 1
+
+  - type: static
+    name: documind-frontend
+    runtime: static
+    repo: https://github.com/MohammedThaher01/documind   # <-- replace with your actual repo
+    branch: main
+    rootDir: frontend
+    buildCommand: "npm install && npm run build"
+    publishDir: "dist"
+    plan: free
+    autoDeploy: yes
+    envVars:
+      # Public env var: your deployed backend URL. Must NOT have a trailing slash.
+      - key: VITE_API_URL
+        value: "https://documind-backend.onrender.com"    # <-- update after backend is live
