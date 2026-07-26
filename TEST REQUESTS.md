@@ -16,12 +16,12 @@ curl -X POST http://localhost:8000/agent \
   -H "Content-Type: application/json" \
   -d '{"request": "We need a proposal for a new client but I havent decided if this is a fixed-price or time-and-materials project yet, the client wants it delivered in 2 weeks but our team says 6 weeks minimum, and we dont have a budget number finalized. Just put something together."}'
 
-Notes for the video:
+Notes for demo:
 - Test 1 shows straightforward multi-step planning + document generation.
 - Test 2 forces the agent to state explicit assumptions (e.g., choosing a
   hybrid pricing model, proposing a phased timeline reconciling 2 vs 6 weeks,
   inserting a placeholder budget range) — this is the "autonomous
-  decision-making under ambiguity" part the assignment is testing.
+  decision-making under ambiguity" behavior the product showcases.
 - Both responses include the full task_list (the agent's self-generated
   TODO list) and a download_url for the final .docx.
 - Open the generated docx to show the "Assumptions Made by the Agent" section
