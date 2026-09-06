@@ -1,32 +1,38 @@
-# render.com Blueprint — deploy with "Blueprints" or use as a reference for
-# a manual Web Service + Static Site setup.
+# render.com Blueprint — deploy via Blueprints or manual Web Service + Static Site.
 #
 # Docs: https://render.com/docs/infrastructure-as-code
 #
-# 1. Set GROQ_API_KEY in the Render dashboard / CLI as an environment secret.
-# 2. (Optional) Set ALLOWED_ORIGINS=https://your-frontend.onrender.com,https://your-custom-domain.com
-# 3. Connect your repo. Render will read this file and create the two services below.
+# Setup order (to beat the chicken-and-egg URL problem):
+#   1. Deploy both services with the permissive defaults below.
+#   2. Backend gets a URL like https://documind-backend-xxxx.onrender.com
+#      Frontend gets a URL like https://documind-frontend-xxxx.onrender.com
+#   3. Paste the frontend URL -> backend ALLOWED_ORIGINS (comma-separated), then redeploy backend.
+#   4. Paste the backend URL -> frontend VITE_API_URL (NO trailing slash), then redeploy frontend.
+#
+# GROQ_API_KEY must be entered manually in Render's UI (sync: false below) —
+# get a free key at https://console.groq.com
 
 services:
   - type: web
     name: documind-backend
     runtime: docker
-    repo: https://github.com/MohammedThaher01/documind   # <-- replace with your actual repo
+    repo: https://github.com/MohammedThaher01/fluid-ai-
     branch: main
-    rootDir: .                                    # Dockerfile lives at repo root
-    dockerCommand: ""                             # uses Dockerfile CMD
-    plan: starter                                 # upgrade to standard for production
+    rootDir: .
+    plan: starter
     healthCheckPath: /health
     autoDeploy: yes
+    numInstances: 1
     envVars:
       - key: GROQ_API_KEY
-        sync: false                               # <-- set this value in Render UI
+        sync: false
       - key: GROQ_MODEL
         value: "llama-3.3-70b-versatile"
       - key: ALLOWED_ORIGINS
-        value: "https://documind-frontend.onrender.com"   # <-- update after frontend is created; comma-separated
-    # Optional: persistent disk so generated .docx files survive deploys.
-    # Without a disk, docs live only in-container until restart.
+        # Permissive default + wildcard so first deploy works; AFTER deploy, replace
+        # with your real frontend URLs (comma-separated, no trailing commas).
+        value: "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,*"
+    # Optional persistent disk — delete the `# ` prefix to enable (~$0.25/GB/month on Render).
     # disk:
     #   name: documind-docs
     #   mountPath: /app/generated_docs
@@ -35,7 +41,7 @@ services:
   - type: static
     name: documind-frontend
     runtime: static
-    repo: https://github.com/MohammedThaher01/documind   # <-- replace with your actual repo
+    repo: https://github.com/MohammedThaher01/fluid-ai-
     branch: main
     rootDir: frontend
     buildCommand: "npm install && npm run build"
@@ -43,6 +49,9 @@ services:
     plan: free
     autoDeploy: yes
     envVars:
-      # Public env var: your deployed backend URL. Must NOT have a trailing slash.
+      # NOTE: after backend deploys, replace this with the REAL backend URL.
+      # Format: https://<your-backend>.onrender.com   — NO trailing slash.
+      # For now we fall back to the live one once you paste it, so the frontend
+      # won't fully work until you do the URL swap step.
       - key: VITE_API_URL
-        value: "https://documind-backend.onrender.com"    # <-- update after backend is live
+        value: ""
