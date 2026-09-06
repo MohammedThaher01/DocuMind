@@ -16,7 +16,7 @@ services:
   - type: web
     name: documind-backend
     runtime: docker
-    repo: https://github.com/MohammedThaher01/fluid-ai-
+    repo: https://github.com/MohammedThaher01/DocuMind
     branch: main
     rootDir: .
     plan: starter
@@ -41,7 +41,7 @@ services:
   - type: static
     name: documind-frontend
     runtime: static
-    repo: https://github.com/MohammedThaher01/fluid-ai-
+    repo: https://github.com/MohammedThaher01/DocuMind
     branch: main
     rootDir: frontend
     buildCommand: "npm install && npm run build"
