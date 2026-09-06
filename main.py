@@ -30,7 +30,16 @@ from docx import Document
 from docx.shared import Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.table import WD_TABLE_ALIGNMENT
+import httpx
 
+@app.get("/test-groq")
+async def test_groq():
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.get("https://api.groq.com")
+            return {"status": r.status_code, "reachable": True}
+    except Exception as e:
+        return {"reachable": False, "error": str(e)}
 # --------------------------------------------------------------------------
 # Config / logging
 # --------------------------------------------------------------------------
