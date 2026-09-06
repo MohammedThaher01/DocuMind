@@ -13,6 +13,7 @@ load_dotenv()
 import os
 import json
 import uuid
+import time
 import logging
 from datetime import datetime
 from typing import TypedDict, List, Optional
@@ -48,10 +49,10 @@ client = Groq(api_key=GROQ_API_KEY)
 OUTPUT_DIR = "generated_docs"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-MAX_LLM_RETRIES = 3
+MAX_LLM_RETRIES = 5
 
 # --------------------------------------------------------------------------
-# LLM call wrapper with retry & fallback
+# LLM call wrapper with retry, sleep, and timeout
 # --------------------------------------------------------------------------
 
 def call_llm(system_prompt: str, user_prompt: str, json_mode: bool = False, temperature: float = 0.4) -> str:
@@ -68,12 +69,15 @@ def call_llm(system_prompt: str, user_prompt: str, json_mode: bool = False, temp
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
+                timeout=30,
                 **kwargs,
             )
             return resp.choices[0].message.content
         except Exception as e:
             last_err = e
             logger.warning(f"LLM call attempt {attempt} failed: {e}")
+            if attempt < MAX_LLM_RETRIES:
+                time.sleep(2 * attempt)
     raise RuntimeError(f"LLM call failed after {MAX_LLM_RETRIES} attempts: {last_err}")
 
 
@@ -348,9 +352,6 @@ def _build_response_from_state(state: AgentState) -> dict:
 
 app = FastAPI(title="DocuMind", version="3.0.0")
 
-# Permissive CORS (kept even with same-origin serving so Vite dev server
-# http://localhost:5173 can proxy against a running instance, and so a
-# separately-hosted custom domain still works if needed later).
 ALLOWED_ORIGINS = os.environ.get(
     "ALLOWED_ORIGINS",
     "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000"
@@ -387,7 +388,6 @@ class AgentResponse(BaseModel):
 
 @app.post("/agent", response_model=AgentResponse)
 def run_agent(payload: AgentRequest):
-    """Run the full autonomous agent pipeline and return the finished doc + download URL."""
     initial_state = _build_initial_state(payload.request)
     try:
         final_state = agent_graph.invoke(initial_state)
@@ -399,8 +399,6 @@ def run_agent(payload: AgentRequest):
 
 @app.get("/")
 def root():
-    """Serve the pre-built React SPA index.html (frontend/dist/index.html)
-    if it exists, otherwise redirect to /docs for the API spec."""
     dist_index = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend", "dist", "index.html")
     if os.path.exists(dist_index):
         return FileResponse(dist_index)
@@ -424,18 +422,9 @@ def health():
     return {"status": "ok", "model": GROQ_MODEL}
 
 
-# --------------------------------------------------------------------------
-# Mount the built frontend dist as /static AND also as the root catch-all
-# --------------------------------------------------------------------------
 _FRONTEND_DIST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend", "dist")
 if os.path.isdir(_FRONTEND_DIST):
-    # /assets/* -> frontend/dist/assets/*
     app.mount("/assets", StaticFiles(directory=os.path.join(_FRONTEND_DIST, "assets")), name="assets")
-    # icons.svg and other public files live at dist root
-    for _public in ("vite.svg", "icons.svg", "favicon.svg"):
-        _p = os.path.join(_FRONTEND_DIST, _public)
-        if os.path.exists(_p):
-            pass  # served by SPA fallback below
     logger.info(f"Frontend assets mounted from {_FRONTEND_DIST}")
 else:
     logger.warning(
