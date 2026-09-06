@@ -260,10 +260,14 @@ export default function App() {
   const onSubmit = async (e) => {
     if (e) e.preventDefault()
     if (!request.trim() || submitting) return
-    resetState()
     setSubmitting(true)
+    setError(null)
+    setResult(null)
+    setTaskList([])
+    setAssumptions([])
+    setDocType('')
     try {
-      const res = await fetch(`${API_BASE}/agent`, {
+      const res = await fetch('/agent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ request: request.trim() }),
@@ -272,26 +276,19 @@ export default function App() {
         const detail = await res.json().catch(() => ({}))
         throw new Error(detail.detail || `Request failed (${res.status})`)
       }
-      const body = await res.json()
-      const id = body.job_id
-      setJobId(id)
-      setStatus('queued')
-      const connected = connectStream(id)
-      if (!connected) {
-        startPollingFallback(id)
-      }
+      const data = await res.json()
+      setResult(data)
+      setTaskList(data.task_list || [])
+      setAssumptions(data.assumptions || [])
+      setDocType(data.doc_type || '')
     } catch (err) {
       setError(err.message || String(err))
-      setStatus('failed')
+    } finally {
       setSubmitting(false)
     }
   }
 
-  const downloadUrl = useMemo(() => {
-    if (!result || !result.download_url) return ''
-    if (/^https?:/i.test(result.download_url)) return result.download_url
-    return `${API_BASE}${result.download_url}`
-  }, [result])
+  const downloadUrl = result?.download_url || ''
 
   const active = submitting || !!jobId
   const charCount = request.length
