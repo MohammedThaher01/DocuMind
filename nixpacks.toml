@@ -5,7 +5,7 @@ nixPkgs = ["python3", "nodejs_20"]
 cmds = [
     "python -m venv /app/.venv",
     "/app/.venv/bin/pip install -r requirements.txt",
-    "cd frontend && rm -rf package-lock.json node_modules && npm install"
+    "cd frontend && rm -rf package-lock.json node_modules && npm install --legacy-peer-deps"
 ]
 
 [phases.build]
