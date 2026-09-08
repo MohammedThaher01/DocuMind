@@ -58,12 +58,12 @@ export default function App() {
   const [error, setError] = useState(null)
 
   const [jobId, setJobId] = useState(null)
-  const [status, setStatus] = useState(null) // queued | running | completed | failed
+  const [status, setStatus] = useState(null)
   const [taskList, setTaskList] = useState([])
   const [assumptions, setAssumptions] = useState([])
   const [docType, setDocType] = useState('')
   const [critique, setCritique] = useState(null)
-  const [result, setResult] = useState(null) // final AgentResponse
+  const [result, setResult] = useState(null)
   const [eventLog, setEventLog] = useState([])
 
   const esRef = useRef(null)
@@ -292,13 +292,7 @@ export default function App() {
       if (data.critique) setCritique(data.critique)
 
       if (data.download_url) {
-        const link = document.createElement('a')
-        link.href = data.download_url
-        const filename = data.download_url.split('/').pop() || 'generated_document.docx'
-        link.setAttribute('download', filename)
-        document.body.appendChild(link)
-        link.click()
-        link.remove()
+        window.location.href = data.download_url
       }
     } catch (err) {
       setStatus('failed')
@@ -314,7 +308,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen w-full">
-      {/* Nav */}
       <header className="max-w-6xl mx-auto px-6 pt-8 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-indigo-500 flex items-center justify-center text-white shadow-soft">
@@ -327,7 +320,6 @@ export default function App() {
           </div>
           <div>
             <div className="font-extrabold text-lg tracking-tight text-slate-900">DocuMind</div>
-            <div className="text-xs text-slate-500 -mt-0.5">Autonomous Document Agent</div>
           </div>
         </div>
         <a
@@ -343,7 +335,6 @@ export default function App() {
         </a>
       </header>
 
-      {/* Hero + input */}
       <main className="max-w-4xl mx-auto px-6 pt-12 pb-24">
         <div className="text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-brand-200 bg-brand-50 text-brand-700 text-xs font-semibold px-3 py-1 mb-5">
@@ -361,7 +352,7 @@ export default function App() {
             Turn a plain-English business request into a polished Word document.
             The agent classifies the document type, fills in gaps with stated
             assumptions, drafts section-by-section, self-critiques, revises,
-            and exports a .docx — all autonomously.
+            and exports a .docx automatically.
           </p>
         </div>
 
@@ -375,7 +366,7 @@ export default function App() {
               rows={5}
               value={request}
               onChange={(e) => setRequest(e.target.value)}
-              placeholder="e.g. Create a product spec for an AI-powered mobile expense tracker…"
+              placeholder="e.g. Create a product spec for an AI-powered mobile expense tracker..."
               className="block w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 placeholder-slate-400 text-[15px] leading-relaxed outline-none ring-brand-500/20 focus:bg-white focus:border-brand-400 focus:ring-4 transition"
               maxLength={4000}
               disabled={submitting}
@@ -396,7 +387,7 @@ export default function App() {
                       <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25" />
                       <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
                     </svg>
-                    Generating…
+                    Generating...
                   </>
                 ) : (
                   <>
@@ -428,7 +419,6 @@ export default function App() {
           </div>
         </form>
 
-        {/* Error */}
         {error && (
           <div className="mt-8 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 flex items-start gap-3">
             <svg viewBox="0 0 24 24" className="w-5 h-5 mt-0.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -443,10 +433,8 @@ export default function App() {
           </div>
         )}
 
-        {/* Progress + results */}
         {active && (
           <section className="mt-10 space-y-6">
-            {/* Status header */}
             <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-soft">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
@@ -488,19 +476,18 @@ export default function App() {
                     {status === 'completed'
                       ? 'All steps finished. Download the document below.'
                       : status === 'failed'
-                      ? 'Generation stopped — see the error above.'
+                      ? 'Generation stopped; see the error above.'
                       : 'Watch the agent plan, draft, self-critique, and export in real time.'}
                   </p>
                 </div>
                 {jobId && (
                   <div className="text-right">
                     <div className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Job ID</div>
-                    <div className="font-mono text-xs text-slate-600 mt-0.5">{jobId.slice(0, 10)}…</div>
+                    <div className="font-mono text-xs text-slate-600 mt-0.5">{jobId.slice(0, 10)}...</div>
                   </div>
                 )}
               </div>
 
-              {/* Task list */}
               {taskList && taskList.length > 0 && (
                 <ol className="mt-5 space-y-2">
                   {taskList.map((t) => {
@@ -524,7 +511,6 @@ export default function App() {
               )}
             </div>
 
-            {/* Assumptions + Critique */}
             {(assumptions.length > 0 || critique) && (
               <div className="grid md:grid-cols-2 gap-6">
                 {assumptions.length > 0 && (
@@ -573,14 +559,13 @@ export default function App() {
                         ))}
                       </ul>
                     ) : (
-                      <p className="text-sm text-slate-600">No issues found — draft passed the quality gate.</p>
+                      <p className="text-sm text-slate-600">No issues found. The draft passed the quality gate.</p>
                     )}
                   </div>
                 )}
               </div>
             )}
 
-            {/* Final result card */}
             {result && (
               <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-brand-50/40 p-6 shadow-soft">
                 <div className="flex flex-wrap items-start justify-between gap-5">
@@ -647,8 +632,8 @@ export default function App() {
         )}
       </main>
 
-      <footer className="max-w-4xl mx-auto px-6 pb-10 text-center text-xs text-slate-500">
-        Powered by FastAPI · LangGraph · Groq · python-docx · Vite · Tailwind CSS
+      <footer className="max-w-4xl mx-auto px-6 pb-10 text-center text-xs text-slate-500 font-semibold tracking-wide">
+        Developed by Mohammed Thaher S
       </footer>
     </div>
   )
