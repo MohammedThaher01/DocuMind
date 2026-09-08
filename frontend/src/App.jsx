@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useState } from 'react'
 
 const API_BASE =
   (import.meta.env && import.meta.env.VITE_API_URL) ||
@@ -57,54 +57,12 @@ export default function App() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
 
-  const [jobId, setJobId] = useState(null)
   const [status, setStatus] = useState(null)
   const [taskList, setTaskList] = useState([])
   const [assumptions, setAssumptions] = useState([])
   const [docType, setDocType] = useState('')
   const [critique, setCritique] = useState(null)
   const [result, setResult] = useState(null)
-  const [eventLog, setEventLog] = useState([])
-
-  const esRef = useRef(null)
-
-  const resetState = () => {
-    if (esRef.current) {
-      try { esRef.current.close() } catch {}
-      esRef.current = null
-    }
-    setJobId(null)
-    setStatus(null)
-    setTaskList([])
-    setAssumptions([])
-    setDocType('')
-    setCritique(null)
-    setResult(null)
-    setEventLog([])
-    setError(null)
-  }
-
-  useEffect(() => {
-    return () => {
-      if (esRef.current) {
-        try { esRef.current.close() } catch {}
-      }
-    }
-  }, [])
-
-  const markTasksRunning = (predicate) => {
-    setTaskList((prev) => {
-      if (!prev || !prev.length) return prev
-      let found = false
-      return prev.map((t) => {
-        if (t.status !== 'done' && !found && predicate(t)) {
-          found = true
-          return { ...t, status: 'running' }
-        }
-        return t
-      })
-    })
-  }
 
   const onSubmit = async (e) => {
     if (e) e.preventDefault()
@@ -326,15 +284,9 @@ export default function App() {
                       ? 'All steps finished. Download the document below.'
                       : status === 'failed'
                       ? 'Generation stopped; see the error above.'
-                      : 'Watch the agent plan, draft, self-critique, and export in real time.'}
+                      : 'Generating document and executing steps...'}
                   </p>
                 </div>
-                {jobId && (
-                  <div className="text-right">
-                    <div className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold">Job ID</div>
-                    <div className="font-mono text-xs text-slate-400 mt-0.5">{jobId.slice(0, 10)}...</div>
-                  </div>
-                )}
               </div>
 
               {taskList && taskList.length > 0 && (
@@ -462,19 +414,6 @@ export default function App() {
                     <dd className="mt-1 font-bold text-xl text-slate-100">{(result.task_list || []).length}</dd>
                   </div>
                 </dl>
-
-                {eventLog.length > 0 && (
-                  <details className="mt-6">
-                    <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wider text-slate-500 hover:text-slate-300 select-none">
-                      Raw event stream ({eventLog.length} events)
-                    </summary>
-                    <div className="mt-3 rounded-xl bg-black/50 text-slate-300 p-4 max-h-72 overflow-auto border border-slate-800/50">
-                      <pre className="text-[11.5px] font-mono whitespace-pre-wrap break-words">
-{eventLog.map((ev) => JSON.stringify(ev)).join('\n')}
-                      </pre>
-                    </div>
-                  </details>
-                )}
               </div>
             )}
           </section>
