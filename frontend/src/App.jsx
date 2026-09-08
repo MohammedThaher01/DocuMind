@@ -258,40 +258,55 @@ export default function App() {
   }
 
   const onSubmit = async (e) => {
-    if (e) e.preventDefault()
-    if (!request.trim() || submitting) return
-    setSubmitting(true)
-    setError(null)
-    setResult(null)
-    setTaskList([])
-    setAssumptions([])
-    setDocType('')
-    try {
-      const res = await fetch('/agent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ request: request.trim() }),
-      })
-      if (!res.ok) {
-        const detail = await res.json().catch(() => ({}))
-        throw new Error(detail.detail || `Request failed (${res.status})`)
+      if (e) e.preventDefault()
+      if (!request.trim() || submitting) return
+
+      setSubmitting(true)
+      setError(null)
+      setResult(null)
+      setTaskList([])
+      setAssumptions([])
+      setDocType('')
+
+      try {
+        const res = await fetch('/agent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ request: request.trim() }),
+        })
+
+        if (!res.ok) {
+          const detail = await res.json().catch(() => ({}))
+          throw new Error(detail.detail || `Request failed (${res.status})`)
+        }
+
+        const data = await res.json()
+
+        setResult(data)
+        setTaskList(data.task_list || [])
+        setAssumptions(data.assumptions || [])
+        setDocType(data.doc_type || '')
+
+        if (data.download_url) {
+          const link = document.createElement('a')
+          link.href = data.download_url
+          const filename = data.download_url.split('/').pop() || 'generated_document.docx'
+          link.setAttribute('download', filename)
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+        }
+        
+      } catch (err) {
+        setError(err.message || String(err))
+      } finally {
+        setSubmitting(false)
       }
-      const data = await res.json()
-      setResult(data)
-      setTaskList(data.task_list || [])
-      setAssumptions(data.assumptions || [])
-      setDocType(data.doc_type || '')
-    } catch (err) {
-      setError(err.message || String(err))
-    } finally {
-      setSubmitting(false)
     }
-  }
 
-  const downloadUrl = result?.download_url || ''
-
-  const active = submitting || !!jobId
-  const charCount = request.length
+    const downloadUrl = result?.download_url || ''
+    const active = submitting 
+    const charCount = request.length
 
   return (
     <div className="min-h-screen w-full">
