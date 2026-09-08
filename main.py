@@ -182,27 +182,30 @@ def node_execute_steps(state: AgentState) -> AgentState:
     return state
 
 
-def node_reflect(state: AgentState) -> AgentState:
-    joined = "\n\n".join(f"### {s['heading']}\n{s['content']}" for s in state["draft_sections"])
+def node_reflect(state: dict) -> dict:
+    draft = state.get("draft", "")
+    request = state.get("request", "")
+    
     system = (
         "You are a critical editor reviewing an AI-generated business document draft. "
-        "Check it against the ORIGINAL user request. Identify concrete issues: missing "
-        "requirements, unaddressed ambiguity, weak/generic content, inconsistent assumptions. "
-        "Respond ONLY with strict JSON: "
-        '{"needs_revision": true/false, "issues": ["issue 1", "issue 2"]}. '
-        "If the draft is genuinely solid, set needs_revision to false with an empty issues list."
+        "Check it against the ORIGINAL user request and flag any of the following: "
+        "missing requirements, unaddressed ambiguity, weak or generic content, inconsistent assumptions, "
+        "contradictory timelines or dates, hallucinated or fabricated specific numbers (prices, budgets, salaries) "
+        "that were not mentioned in the original request, and team size inconsistencies. "
+        "If the draft invents specific financial figures or pricing that the user never mentioned, flag it as high-risk assumption. "
+        'Respond ONLY with strict JSON: {"needs_revision": true/false, "issues": ["issue 1", "issue 2"]}. '
+        "If the draft is genuinely solid with no fabrications, set needs_revision to false with an empty issues list."
     )
-    user = f"Original request: {state['request']}\n\nDraft:\n{joined}"
-    raw = call_llm(system, user, json_mode=True, temperature=0.2)
-    critique = safe_json_parse(raw, {"needs_revision": False, "issues": []})
-
-    for t in state["task_list"]:
-        if t["title"] == "Self-critique draft":
-            t["status"] = "done"
-
-    state["critique"] = critique
-    logger.info(f"Reflection result: {critique}")
-    return state
+    
+    prompt = f"ORIGINAL REQUEST:\n{request}\n\nDRAFT TO REVIEW:\n{draft}"
+    
+    try:
+        raw = call_llm(system, prompt, json_mode=True, temperature=0.2)
+        parsed = json.loads(raw)
+        return {"critique": parsed}
+    except Exception as e:
+        logger.error(f"Reflection failed: {e}")
+        return {"critique": {"needs_revision": False, "issues": []}}
 
 
 def node_revise(state: AgentState) -> AgentState:
