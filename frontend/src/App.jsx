@@ -258,55 +258,59 @@ export default function App() {
   }
 
   const onSubmit = async (e) => {
-      if (e) e.preventDefault()
-      if (!request.trim() || submitting) return
+    if (e) e.preventDefault()
+    if (!request.trim() || submitting) return
 
-      setSubmitting(true)
-      setError(null)
-      setResult(null)
-      setTaskList([])
-      setAssumptions([])
-      setDocType('')
+    setSubmitting(true)
+    setStatus('running')
+    setError(null)
+    setResult(null)
+    setTaskList([])
+    setAssumptions([])
+    setDocType('')
+    setCritique(null)
 
-      try {
-        const res = await fetch('/agent', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ request: request.trim() }),
-        })
+    try {
+      const res = await fetch('/agent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ request: request.trim() }),
+      })
 
-        if (!res.ok) {
-          const detail = await res.json().catch(() => ({}))
-          throw new Error(detail.detail || `Request failed (${res.status})`)
-        }
-
-        const data = await res.json()
-
-        setResult(data)
-        setTaskList(data.task_list || [])
-        setAssumptions(data.assumptions || [])
-        setDocType(data.doc_type || '')
-
-        if (data.download_url) {
-          const link = document.createElement('a')
-          link.href = data.download_url
-          const filename = data.download_url.split('/').pop() || 'generated_document.docx'
-          link.setAttribute('download', filename)
-          document.body.appendChild(link)
-          link.click()
-          document.body.removeChild(link)
-        }
-        
-      } catch (err) {
-        setError(err.message || String(err))
-      } finally {
-        setSubmitting(false)
+      if (!res.ok) {
+        const detail = await res.json().catch(() => ({}))
+        throw new Error(detail.detail || `Request failed (${res.status})`)
       }
-    }
 
-    const downloadUrl = result?.download_url || ''
-    const active = submitting 
-    const charCount = request.length
+      const data = await res.json()
+
+      setStatus('completed')
+      setResult(data)
+      setTaskList(data.task_list || [])
+      setAssumptions(data.assumptions || [])
+      setDocType(data.doc_type || '')
+      if (data.critique) setCritique(data.critique)
+
+      if (data.download_url) {
+        const link = document.createElement('a')
+        link.href = data.download_url
+        const filename = data.download_url.split('/').pop() || 'generated_document.docx'
+        link.setAttribute('download', filename)
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+      }
+    } catch (err) {
+      setStatus('failed')
+      setError(err.message || String(err))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const downloadUrl = result?.download_url || ''
+  const active = submitting || Boolean(result) || taskList.length > 0 || Boolean(error)
+  const charCount = request.length
 
   return (
     <div className="min-h-screen w-full">
@@ -596,8 +600,7 @@ export default function App() {
                   </div>
                   <a
                     href={downloadUrl}
-                    target="_blank"
-                    rel="noreferrer"
+                    download
                     className="inline-flex items-center gap-2 rounded-xl bg-slate-900 hover:bg-slate-800 px-5 py-3 text-sm font-semibold text-white shadow-soft transition"
                   >
                     <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -613,16 +616,16 @@ export default function App() {
                   <div className="rounded-xl border border-slate-200 bg-white p-4">
                     <dt className="text-xs font-semibold uppercase tracking-wider text-slate-500">Sections drafted</dt>
                     <dd className="mt-1 font-bold text-xl text-slate-900">
-                      {result.task_list.filter((t) => String(t.title).startsWith('Draft section')).length}
+                      {(result.task_list || []).filter((t) => String(t.title).startsWith('Draft section')).length}
                     </dd>
                   </div>
                   <div className="rounded-xl border border-slate-200 bg-white p-4">
                     <dt className="text-xs font-semibold uppercase tracking-wider text-slate-500">Assumptions stated</dt>
-                    <dd className="mt-1 font-bold text-xl text-slate-900">{result.assumptions.length}</dd>
+                    <dd className="mt-1 font-bold text-xl text-slate-900">{(result.assumptions || []).length}</dd>
                   </div>
                   <div className="rounded-xl border border-slate-200 bg-white p-4">
                     <dt className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total steps</dt>
-                    <dd className="mt-1 font-bold text-xl text-slate-900">{result.task_list.length}</dd>
+                    <dd className="mt-1 font-bold text-xl text-slate-900">{(result.task_list || []).length}</dd>
                   </div>
                 </dl>
 
