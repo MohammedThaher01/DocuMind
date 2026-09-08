@@ -15,6 +15,7 @@ import json
 import uuid
 import time
 import logging
+import re
 from datetime import datetime
 from typing import TypedDict, List, Optional
 
@@ -410,10 +411,15 @@ def download_file(filename: str):
     fpath = os.path.join(OUTPUT_DIR, filename)
     if not os.path.exists(fpath):
         raise HTTPException(status_code=404, detail="File not found")
+        
+    # Strip the hex suffix, replace underscores with spaces, and apply Title Case
+    clean_name = re.sub(r'_[a-f0-9]+\.docx$', '', filename)
+    clean_name = clean_name.replace('_', ' ').title() + '.docx'
+
     return FileResponse(
         fpath,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        filename=filename,
+        filename=clean_name,
     )
 
 
