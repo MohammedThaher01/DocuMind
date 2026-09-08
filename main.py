@@ -39,7 +39,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(
 logger = logging.getLogger("agent")
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
-GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama3-70b-8192")
 
 if not GROQ_API_KEY:
     logger.warning("GROQ_API_KEY not set. Set it as an environment variable before running.")
