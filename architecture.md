@@ -7,8 +7,8 @@ DocuMind bridges the gap between raw LLM text generation and enterprise-grade re
 
 The application is deployed live and can be interacted with via the web UI or API endpoints.
 
-*   **Live Chat UI:** [docu-mind.up.railway.app](docu-mind.up.railway.app) 
-*   **API Documentation (Swagger):** [https://trendly-agent-1.onrender.com/docs](https://docu-mind.up.railway.app/docs)
+*   **Live Chat UI:** [docu-mind.up.railway.app](https://docu-mind.up.railway.app/)
+*   **API Documentation (Swagger):** [https://docu-mind.up.railway.app/docs](https://docu-mind.up.railway.app/docs)
 
 ## System Architecture
 
