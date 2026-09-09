@@ -1,13 +1,61 @@
-Here is the complete architecture document updated with a Mermaid.js flowchart, which natively renders in GitHub repositories.
+**System Flowchart**
 
+```text
+[ User ]
+   │
+   │ Plain English Prompt
+   ▼
+[ React Frontend ]
+   │
+   │ POST /agent
+   ▼
+┌───────────────────────────────────────────────────────┐
+│               LANGGRAPH EXECUTION PIPELINE            │
+│                                                       │
+│  [ Classification & Planning ]                        │
+│               │                                       │
+│               ▼                                       │
+│  [ Assumption Extraction ]                            │
+│               │                                       │
+│               ▼                                       │
+│  [ Section Drafting ]                                 │
+│               │                                       │
+│               ▼                                       │
+│  < Logic Gate: Self-Critique > ◄────────┐             │
+│               │                         │             │
+│          (Validated)             (Issues Detected)    │
+│               │                         │             │
+│               ▼                         │             │
+│  [ Artifact Export .docx ]       [ Revision Loop ]    │
+└───────────────────────────────────────────────────────┘
+   │
+   │ Returns download_url
+   ▼
+[ React Frontend ]
+   │
+   │ GET /download/[filename]
+   ▼
+[ FastAPI Backend ]
+   │
+   │ Native File Download
+   ▼
+[ User ]
+
+```
+
+---
+
+Here is the complete, error-free Markdown file for your repository. You can copy and paste this directly into `architecture.md`.
+
+```markdown
 # DocuMind System Architecture
 
 ## System Overview
-
 DocuMind is a unified full-stack application leveraging a synchronous REST architecture. The system integrates a client-side React frontend with a Python-based FastAPI backend, utilizing LangGraph as the stateful orchestration engine for the autonomous agent.
 
 ## Architecture Flowchart
 
+```mermaid
 graph TD
     User([User]) -->|Plain English Prompt| UI[React Frontend]
     
@@ -28,6 +76,8 @@ graph TD
     Export -->|Returns download_url| UI
     UI -->|GET /download/[filename]| API
     API -->|Native File Download| User
+
+```
 
 ## Core Components
 
@@ -56,8 +106,12 @@ The LangGraph state machine dictates the flow of data through the following node
 * LangGraph manages the conversational state and calls the Groq API multiple times for planning, drafting, and reflection.
 * Upon successful validation, the backend saves the `.docx` file to a local output directory.
 * The backend responds to the frontend with execution metadata and a structured `download_url`.
-* The frontend bypasses popup blockers by assigning the window location to `GET /download/{filename}`, triggering the browser's native file download process.
+* The frontend bypasses popup blockers by assigning the window location to `GET /download/[filename]`, triggering the browser's native file download process.
 
 ## Deployment Model
 
 The application uses a monolithic deployment strategy to maximize operational simplicity and stability. The React frontend is compiled into static assets within a `dist/` directory. The FastAPI server is configured to mount this directory and serve the UI alongside the API endpoints from a single unified container on platforms like Railway or Render. This eliminates Cross-Origin Resource Sharing (CORS) complexity and guarantees resilient routing between the frontend and the agent backend.
+
+```
+
+```
