@@ -7,7 +7,6 @@ DocuMind bridges the gap between raw LLM text generation and enterprise-grade re
 ## System Architecture
 
 DocuMind operates on a synchronous REST architecture, decoupling a Vite/React frontend from a Python/FastAPI backend orchestrated by LangGraph. 
-## Architecture & Approach
 
 ## Architecture & Approach
 
@@ -44,10 +43,10 @@ DocuMind operates on a synchronous REST architecture, decoupling a Vite/React fr
 │   ┌─────────────────────────┐   6. Issues Detected  │
 │   │ Logic Gate:              │─────────┐            │
 │   │ Self-Critique            │◀────────┤            │
-│   └─────────────────────────┘         │            │
+│   └─────────────────────────┘          │            │
 │              │ 7. Validated      ┌──────────────┐   │
 │              ▼                   │ Revision Loop│   │
-│   ┌─────────────────────────┐   └──────────────┘   │
+│   ┌─────────────────────────┐    └──────────────┘   │
 │   │ Artifact Export (.docx) │                      │
 │   └─────────────────────────┘                      │
 └───────────────────────────────────────────────────┘
@@ -59,7 +58,7 @@ DocuMind operates on a synchronous REST architecture, decoupling a Vite/React fr
          │ 9. GET /download/{filename}
          ▼
 ┌─────────────────┐
-│      User        │  <-- Native file download
+│      User       │  <-- Native file download
 └─────────────────┘
 ```
 
