@@ -8,7 +8,6 @@ DocuMind is a unified full-stack application leveraging a synchronous REST archi
 
 ## Architecture Flowchart
 
-```mermaid
 graph TD
     User([User]) -->|Plain English Prompt| UI[React Frontend]
     
@@ -27,10 +26,8 @@ graph TD
     end
     
     Export -->|Returns download_url| UI
-    UI -->|GET /download/{filename}| API
+    UI -->|GET /download/[filename]| API
     API -->|Native File Download| User
-
-```
 
 ## Core Components
 
