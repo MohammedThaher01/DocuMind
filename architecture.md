@@ -5,7 +5,10 @@
 DocuMind bridges the gap between raw LLM text generation and enterprise-grade reliability. It transforms ambiguous, plain-English business requests into formatted `.docx` files through a deterministic, multi-stage ReAct pipeline. Rather than simply completing text, DocuMind prioritizes assumption governance by explicitly identifying missing requirements, resolving commercial conflicts, and auditing its own drafts for mathematical and chronological consistency before delivering a final artifact.
 
 
-Here is the live link! : docu-mind.up.railway.app
+The application is deployed live and can be interacted with via the web UI or API endpoints.
+
+*   **Live Chat UI:** [docu-mind.up.railway.app](docu-mind.up.railway.app) 
+*   **API Documentation (Swagger):** [https://trendly-agent-1.onrender.com/docs](https://docu-mind.up.railway.app/docs)
 
 ## System Architecture
 
