@@ -44,7 +44,7 @@ DocuMind operates on a synchronous REST architecture, decoupling a Vite/React fr
 │   │          Generate content section by section        │   │
 │   └──────────────────────────┬──────────────────────────┘   │
 │                              │                              │
-│                              │ 5. Draft                    │
+│                              │ 5. Draft                  b  │
 │                              ▼                              │
 │   ┌─────────────────────────────────────────────────────┐   │
 │   │              Logic Gate / Self-Critique             │   │
