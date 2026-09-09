@@ -1,7 +1,3 @@
-I double-wrapped the Markdown block in my previous response, which breaks the formatting and exposes the raw backticks instead of rendering cleanly.
-
-Here is a visual text-based flowchart you can view directly, followed by the clean Markdown text for your repository.
-
 **Architecture Flowchart**
 
 ```text
