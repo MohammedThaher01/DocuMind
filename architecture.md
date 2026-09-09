@@ -1,4 +1,4 @@
-```markdown
+
 # DocuMind
 
 **Autonomous Document Generation Agent**
