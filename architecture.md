@@ -1,48 +1,46 @@
 **Architecture Flowchart**
 
-```text
-[ User ]
-   |
-   | (Plain English Prompt)
-   v
-[ React Frontend ]
-   |
-   | (POST /agent)
-   v
-[ FastAPI Backend ]
-   |
-   +---> [ Classification & Planning ]
-                 |
-                 v
-         [ Assumption Extraction ]
-                 |
-                 v
-         [ Section Drafting ]
-                 |
-                 v
-         { Logic Gate: Self-Critique } <---+
-                 |                         |
-          (Issues Detected)                |
-                 v                         |
-         [ Revision Loop ] ----------------+
-                 |
-            (Validated)
-                 v
-   +---> [ Artifact Export .docx ]
-   |
-   | (Returns download_url)
-   v
-[ React Frontend ]
-   |
-   | (GET /download/[filename])
-   v
-[ FastAPI Backend ]
-   |
-   | (Native File Download)
-   v
-[ User ]
-
-```
+┌────────────────┐
+│      User      │
+└───────┬────────┘
+        │ Plain English Prompt
+        ▼
+┌────────────────┐
+│ React Frontend │
+└───────┬────────┘
+        │ POST /agent
+        ▼
+┌────────────────────────────────────────────────────────┐
+│ FastAPI Backend & LangGraph Pipeline                   │
+│                                                        │
+│  1. Classification & Planning                          │
+│         ▼                                              │
+│  2. Assumption Extraction                              │
+│         ▼                                              │
+│  3. Section Drafting (Groq API)                        │
+│         ▼                                              │
+│  4. Logic Gate: Self-Critique ◄──────────────┐         │
+│         │                                    │         │
+│         ├─(Issues)──► Revision Loop ─────────┘         │
+│         │                                              │
+│         ▼ (Validated)                                  │
+│  5. Artifact Export (.docx)                            │
+└───────┬────────────────────────────────────────────────┘
+        │ Returns download_url
+        ▼
+┌────────────────┐
+│ React Frontend │
+└───────┬────────┘
+        │ GET /download/[filename]
+        ▼
+┌────────────────┐
+│ FastAPI Backend│
+└───────┬────────┘
+        │ Native File Download
+        ▼
+┌────────────────┐
+│      User      │
+└────────────────┘
 
 ---
 
