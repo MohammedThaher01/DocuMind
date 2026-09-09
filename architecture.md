@@ -7,28 +7,67 @@ DocuMind bridges the gap between raw LLM text generation and enterprise-grade re
 ## System Architecture
 
 DocuMind operates on a synchronous REST architecture, decoupling a Vite/React frontend from a Python/FastAPI backend orchestrated by LangGraph. 
+## Architecture & Approach
 
-```mermaid
-graph TD
-    User([User]) -->|Plain English Prompt| UI[React Frontend]
-    
-    UI -->|POST /agent| API[FastAPI Backend]
-    
-    subgraph LangGraph Execution Pipeline
-        API --> Plan[Classification & Planning]
-        Plan --> Assume[Assumption Extraction]
-        Assume --> Draft[Section Drafting]
-        Draft --> Critique{Logic Gate: Self-Critique}
-        
-        Critique -->|Issues Detected| Revise[Revision Loop]
-        Revise --> Critique
-        
-        Critique -->|Validated| Export[Artifact Export .docx]
-    end
-    
-    Export -->|Returns download_url| UI
-    UI -->|GET /download/[filename]| API
-    API -->|Native File Download| User
+```
+ ┌──────────────────┐
+ │     User          │
+ └──────────────────┘
+          │
+          │ 1. Plain English Prompt
+          ▼
+ ┌──────────────────┐
+ │  React Frontend   │
+ └──────────────────┘
+          │
+          │ 2. POST /agent
+          ▼
+ ┌──────────────────┐
+ │  FastAPI Backend  │
+ └──────────────────┘
+          │
+          ▼
+ ┌─────────────────────────────────────────────┐
+ │        LangGraph Execution Pipeline           │
+ │                                                │
+ │  ┌───────────────────────┐                    │
+ │  │ Classification &       │                    │
+ │  │ Planning                │                    │
+ │  └───────────────────────┘                    │
+ │             │                                  │
+ │             ▼                                  │
+ │  ┌───────────────────────┐                    │
+ │  │ Assumption Extraction   │◄─────────────┐    │
+ │  └───────────────────────┘               │    │
+ │             │                             │    │
+ │             ▼                             │    │
+ │  ┌───────────────────────┐               │    │
+ │  │ Section Drafting        │               │    │
+ │  └───────────────────────┘               │    │
+ │             │                             │    │
+ │             ▼                             │    │
+ │  ┌───────────────────────┐    Issues     │    │
+ │  │ Logic Gate:              ├──Detected───┘    │
+ │  │ Self-Critique            │                    │
+ │  └───────────────────────┘                    │
+ │             │ Validated                         │
+ │             ▼                                  │
+ │  ┌───────────────────────┐                    │
+ │  │ Artifact Export          │                    │
+ │  │ (.docx generated)        │                    │
+ │  └───────────────────────┘                    │
+ └─────────────────┬──────────────────────────────┘
+                    │ 5. Returns download_url
+                    ▼
+ ┌──────────────────┐
+ │  React Frontend   │
+ └──────────────────┘
+          │
+          │ 6. GET /download/{filename}
+          ▼
+ ┌──────────────────┐
+ │     User          │
+ └──────────────────┘
 ```
 
 ## Agentic Execution Pipeline
