@@ -2,9 +2,7 @@
 
 **Autonomous Document Generation Agent**
 
-DocuMind bridges the gap between raw LLM text generation and enterprise-grade reliability. It transforms ambiguous, plain-English business requests into formatted `.docx` files through a deterministic, multi-stage ReAct pipeline. Rather than simply completing text, DocuMind prioritizes assumption governance—explicitly identifying missing requirements, resolving commercial conflicts, and auditing its own drafts for mathematical and chronological consistency before delivering a final artifact.
-
----
+DocuMind bridges the gap between raw LLM text generation and enterprise-grade reliability. It transforms ambiguous, plain-English business requests into formatted `.docx` files through a deterministic, multi-stage ReAct pipeline. Rather than simply completing text, DocuMind prioritizes assumption governance by explicitly identifying missing requirements, resolving commercial conflicts, and auditing its own drafts for mathematical and chronological consistency before delivering a final artifact.
 
 ## The Architecture
 
@@ -18,31 +16,27 @@ The agentic pipeline executes in five distinct phases:
 * **The Logic Gate (Self-Critique):** A strict validation node intercepts the completed draft. It audits for timeline collisions (e.g., MVP scheduled for both Week 2 and Week 4), mathematical inconsistencies (e.g., workload estimates clashing with team size), and fabricated commercial figures (e.g., unprompted budgets or fixed-price quotes). Unverified specifics are flagged as high-risk assumptions, triggering a revision loop.
 * **Document Export:** Compiles the validated draft and operational metadata into a native `.docx` file using `python-docx`, passing a clean download URL back to the client.
 
----
-
 ## Technical Stack
 
 **Backend System**
 
-* **Python 3.12** / **FastAPI:** High-performance, synchronous REST API.
+* **Python 3.12 / FastAPI:** High-performance, synchronous REST API.
 * **LangGraph:** Stateful, graph-based orchestration for the agentic loop.
 * **Groq API:** Ultra-low latency LLM inference (optimized for `openai/gpt-oss-20b` or `groq/compound` utilizing JSON mode).
 * **python-docx:** Native Word document compilation.
 
 **Frontend Interface**
 
-* **React 18** / **Vite:** Lightning-fast component rendering and state management.
+* **React 18 / Vite:** Lightning-fast component rendering and state management.
 * **Tailwind CSS:** Fully responsive, custom dark-mode UI with dynamic SVG status indicators.
-
----
 
 ## Local Development Setup
 
 **1. Clone the repository**
 
 ```bash
-git clone https://github.com/MohammedThaher01/documind.git
-cd documind
+git clone https://github.com/MohammedThaher01/DocuMind.git
+cd DocuMind
 
 ```
 
@@ -84,8 +78,6 @@ npm run dev
 
 ```
 
----
-
 ## Core API Surface
 
 The backend exposes a minimal, highly deliberate API surface designed to prevent asynchronous state leakage:
@@ -95,10 +87,8 @@ Accepts a JSON payload containing the user's raw prompt. Executes the complete L
 * `GET /download/{filename}`
 Serves the generated `.docx` file using FastAPI's `FileResponse`. Implements regex sanitization to strip backend hex identifiers and format the file with clean Title Casing before forcing a native browser download.
 
----
-
 ## Deployment
 
-DocuMind is configured for immediate deployment on platforms like Railway or Render. The application executes as a unified full-stack service: the React application is built statically into the `dist/` directory, and the FastAPI application mounts and serves these static assets alongside the API endpoints from a single container instance.
+DocuMind is configured for immediate deployment on platforms like Railway or Render. The application executes as a unified full-stack service. The React application is built statically into the `dist/` directory, and the FastAPI application mounts and serves these static assets alongside the API endpoints from a single container instance.
 
 *Developed by Mohammed Thaher S*
