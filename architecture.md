@@ -1,54 +1,59 @@
-**System Flowchart**
+I double-wrapped the Markdown block in my previous response, which breaks the formatting and exposes the raw backticks instead of rendering cleanly.
+
+Here is a visual text-based flowchart you can view directly, followed by the clean Markdown text for your repository.
+
+**Architecture Flowchart**
 
 ```text
 [ User ]
-   │
-   │ Plain English Prompt
-   ▼
+   |
+   | (Plain English Prompt)
+   v
 [ React Frontend ]
-   │
-   │ POST /agent
-   ▼
-┌───────────────────────────────────────────────────────┐
-│               LANGGRAPH EXECUTION PIPELINE            │
-│                                                       │
-│  [ Classification & Planning ]                        │
-│               │                                       │
-│               ▼                                       │
-│  [ Assumption Extraction ]                            │
-│               │                                       │
-│               ▼                                       │
-│  [ Section Drafting ]                                 │
-│               │                                       │
-│               ▼                                       │
-│  < Logic Gate: Self-Critique > ◄────────┐             │
-│               │                         │             │
-│          (Validated)             (Issues Detected)    │
-│               │                         │             │
-│               ▼                         │             │
-│  [ Artifact Export .docx ]       [ Revision Loop ]    │
-└───────────────────────────────────────────────────────┘
-   │
-   │ Returns download_url
-   ▼
-[ React Frontend ]
-   │
-   │ GET /download/[filename]
-   ▼
+   |
+   | (POST /agent)
+   v
 [ FastAPI Backend ]
-   │
-   │ Native File Download
-   ▼
+   |
+   +---> [ Classification & Planning ]
+                 |
+                 v
+         [ Assumption Extraction ]
+                 |
+                 v
+         [ Section Drafting ]
+                 |
+                 v
+         { Logic Gate: Self-Critique } <---+
+                 |                         |
+          (Issues Detected)                |
+                 v                         |
+         [ Revision Loop ] ----------------+
+                 |
+            (Validated)
+                 v
+   +---> [ Artifact Export .docx ]
+   |
+   | (Returns download_url)
+   v
+[ React Frontend ]
+   |
+   | (GET /download/[filename])
+   v
+[ FastAPI Backend ]
+   |
+   | (Native File Download)
+   v
 [ User ]
 
 ```
 
 ---
 
-```markdown
 # DocuMind System Architecture
 
 ## System Overview
+
 DocuMind is a unified full-stack application leveraging a synchronous REST architecture. The system integrates a client-side React frontend with a Python-based FastAPI backend, utilizing LangGraph as the stateful orchestration engine for the autonomous agent.
 
 ## Architecture Flowchart
@@ -109,7 +114,3 @@ The LangGraph state machine dictates the flow of data through the following node
 ## Deployment Model
 
 The application uses a monolithic deployment strategy to maximize operational simplicity and stability. The React frontend is compiled into static assets within a `dist/` directory. The FastAPI server is configured to mount this directory and serve the UI alongside the API endpoints from a single unified container on platforms like Railway or Render. This eliminates Cross-Origin Resource Sharing (CORS) complexity and guarantees resilient routing between the frontend and the agent backend.
-
-```
-
-```
