@@ -9,66 +9,80 @@ DocuMind bridges the gap between raw LLM text generation and enterprise-grade re
 DocuMind operates on a synchronous REST architecture, decoupling a Vite/React frontend from a Python/FastAPI backend orchestrated by LangGraph. 
 ## Architecture & Approach
 
-```
- ┌──────────────────┐
- │     User          │
- └──────────────────┘
-          │
-          │ 1. Plain English Prompt
-          ▼
- ┌──────────────────┐
- │  React Frontend   │
- └──────────────────┘
-          │
-          │ 2. POST /agent
-          ▼
- ┌──────────────────┐
- │  FastAPI Backend  │
- └──────────────────┘
-          │
-          ▼
- ┌─────────────────────────────────────────────┐
- │        LangGraph Execution Pipeline           │
- │                                                │
- │  ┌───────────────────────┐                    │
- │  │ Classification &       │                    │
- │  │ Planning                │                    │
- │  └───────────────────────┘                    │
- │             │                                  │
- │             ▼                                  │
- │  ┌───────────────────────┐                    │
- │  │ Assumption Extraction   │◄─────────────┐    │
- │  └───────────────────────┘               │    │
- │             │                             │    │
- │             ▼                             │    │
- │  ┌───────────────────────┐               │    │
- │  │ Section Drafting        │               │    │
- │  └───────────────────────┘               │    │
- │             │                             │    │
- │             ▼                             │    │
- │  ┌───────────────────────┐    Issues     │    │
- │  │ Logic Gate:              ├──Detected───┘    │
- │  │ Self-Critique            │                    │
- │  └───────────────────────┘                    │
- │             │ Validated                         │
- │             ▼                                  │
- │  ┌───────────────────────┐                    │
- │  │ Artifact Export          │                    │
- │  │ (.docx generated)        │                    │
- │  └───────────────────────┘                    │
- └─────────────────┬──────────────────────────────┘
-                    │ 5. Returns download_url
-                    ▼
- ┌──────────────────┐
- │  React Frontend   │
- └──────────────────┘
-          │
-          │ 6. GET /download/{filename}
-          ▼
- ┌──────────────────┐
- │     User          │
- └──────────────────┘
-```
+┌──────────────────────────┐
+│      React Frontend      │
+└──────────────────────────┘
+             │
+             │ 1. Plain-English Prompt
+             ▼
+┌──────────────────────────┐
+│     FastAPI Backend      │
+│        POST /agent       │
+└──────────────────────────┘
+             │
+             │ 2. Invoke Agent
+             ▼
+┌─────────────────────────────────────────────────────────────┐
+│                  LangGraph Execution Pipeline               │
+│                                                             │
+│   ┌─────────────────────────────────────────────────────┐   │
+│   │          Classification & Planning                  │   │
+│   │       Determine document type and structure         │   │
+│   └──────────────────────────┬──────────────────────────┘   │
+│                              │                              │
+│                              │ 3. Document Plan             │
+│                              ▼                              │
+│   ┌─────────────────────────────────────────────────────┐   │
+│   │              Assumption Extraction                  │   │
+│   │       Identify and fill missing information         │   │
+│   └──────────────────────────┬──────────────────────────┘   │
+│                              │                              │
+│                              │ 4. Enriched Context          │
+│                              ▼                              │
+│   ┌─────────────────────────────────────────────────────┐   │
+│   │                 Section Drafting                    │   │
+│   │          Generate content section by section        │   │
+│   └──────────────────────────┬──────────────────────────┘   │
+│                              │                              │
+│                              │ 5. Draft                    │
+│                              ▼                              │
+│   ┌─────────────────────────────────────────────────────┐   │
+│   │              Logic Gate / Self-Critique             │   │
+│   │   Check completeness, consistency, and logic        │   │
+│   └───────────────┬──────────────────────┬──────────────┘   │
+│                   │                      │                  │
+│            6. Issues Found        7. Validated              │
+│                   │                      │                  │
+│                   ▼                      ▼                  │
+│   ┌────────────────────────┐   ┌─────────────────────────┐  │
+│   │     Revision Loop      │   │    Artifact Export      │  │
+│   │  Revise detected       │   │    Generate .docx       │  │
+│   │  issues in the draft   │   │    document             │  │
+│   └────────────┬───────────┘   └────────────┬────────────┘  │
+│                │                            │               │
+│                │                            │ 8. Download URL
+│                └──────────────┐             │               │
+│                               │             │               │
+│                               ▼             │               │
+│                    ┌────────────────────┐   │               │
+│                    │  Logic Gate /      │◄──┘               │
+│                    │  Self-Critique     │                   │
+│                    └────────────────────┘                   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+             │
+             │ 8. Return download_url
+             ▼
+┌──────────────────────────┐
+│      React Frontend      │
+└──────────────────────────┘
+             │
+             │ 9. GET /download/{filename}
+             ▼
+┌──────────────────────────┐
+│          User            │
+│    Native .docx Download │
+└──────────────────────────┘
 
 ## Agentic Execution Pipeline
 
