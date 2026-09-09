@@ -1,38 +1,34 @@
+Here is the complete architecture document updated with a Mermaid.js flowchart, which natively renders in GitHub repositories.
+
 # DocuMind System Architecture
 
 ## System Overview
 
 DocuMind is a unified full-stack application leveraging a synchronous REST architecture. The system integrates a client-side React frontend with a Python-based FastAPI backend, utilizing LangGraph as the stateful orchestration engine for the autonomous agent.
 
-## Execution Flowchart
+## Architecture Flowchart
 
 ```mermaid
-flowchart TD
-    %% Client Side
-    User([User]) -->|Inputs Prompt| UI[React Frontend]
+graph TD
+    User([User]) -->|Plain English Prompt| UI[React Frontend]
+    
     UI -->|POST /agent| API[FastAPI Backend]
-
-    %% Backend & Orchestration
-    subgraph Agentic Pipeline [LangGraph Orchestration]
-        direction TB
-        Plan[Classification & Planning] --> Extract[Assumption Extraction]
-        Extract --> Draft[Section Drafting via Groq API]
-        Draft --> Critique{The Logic Gate<br>Self-Critique}
+    
+    subgraph LangGraph Execution Pipeline
+        API --> Plan[Classification & Planning]
+        Plan --> Assume[Assumption Extraction]
+        Assume --> Draft[Section Drafting]
+        Draft --> Critique{Logic Gate: Self-Critique}
         
         Critique -->|Issues Detected| Revise[Revision Loop]
         Revise --> Critique
         
-        Critique -->|Approved| ExportDoc[Document Export Node]
+        Critique -->|Validated| Export[Artifact Export .docx]
     end
-
-    API --> Plan
-    ExportDoc -->|Generates .docx| FS[(File System)]
-    ExportDoc -->|Returns download_url| UI
-
-    %% File Download
-    UI -->|GET /download/{filename}| DownloadAPI[FileResponse Endpoint]
-    FS --> DownloadAPI
-    DownloadAPI -->|Native Download| User
+    
+    Export -->|Returns download_url| UI
+    UI -->|GET /download/{filename}| API
+    API -->|Native File Download| User
 
 ```
 
