@@ -45,8 +45,6 @@
 
 ---
 
-Here is the complete, error-free Markdown file for your repository. You can copy and paste this directly into `architecture.md`.
-
 ```markdown
 # DocuMind System Architecture
 
