@@ -17,7 +17,6 @@ import copy
 import uuid
 import time
 import logging
-import re
 from datetime import datetime
 from typing import TypedDict, List, Optional
 
@@ -743,10 +742,16 @@ def node_execute_steps(state: AgentState) -> AgentState:
     drafted = []
     for sec in state["sections"]:
         system = (
-            f"You are drafting the '{sec['heading']}' section of a {state['doc_type'].replace('_', ' ')} "
-            "for a professional business audience. Write clear, concrete, well-structured content "
-            "(use realistic mock data/numbers/names where specifics are missing - never leave placeholders "
-            "like [insert here]). 120-220 words. Plain text, no markdown symbols."
+            f"You are drafting the '{sec['heading']}' section of a "
+            f"{state['doc_type'].replace('_', ' ')} for a professional business audience. "
+            "Write clear, concrete, well-structured content. Use only facts explicitly stated in "
+            "the original request or clearly identified in the assumptions supplied to you. Do not "
+            "invent company names, people, dates, financial amounts, prices, percentages, KPIs, "
+            "team sizes, performance results, sources, policies or commitments. If important "
+            "information is missing, state that it was not specified and explain what needs "
+            "confirmation. Any illustrative example must be explicitly labelled hypothetical and "
+            "must not be presented as fact. Do not contradict the original request. Aim for "
+            "120-220 words. Use plain text without Markdown symbols."
         )
         user = (
             f"Original user request: {state['request']}\n\n"
@@ -837,27 +842,27 @@ def run_reflection(state: AgentState, draft_sections: List[dict], stage: str) ->
 
 
 def node_reflect(state: AgentState) -> AgentState:
-    joined = "\n\n".join(f"### {s['heading']}\n{s['content']}" for s in state["draft_sections"])
-    system = (
-        "You are a critical editor reviewing an AI-generated business document draft. "
-        "Check it against the ORIGINAL user request. Identify concrete issues: missing "
-        "requirements, unaddressed ambiguity, weak/generic content, inconsistent assumptions. "
-        "Respond ONLY with strict JSON: "
-        '{"needs_revision": true/false, "issues": ["issue 1", "issue 2"]}. '
-        "If the draft is genuinely solid, set needs_revision to false with an empty issues list."
-    )
-    user = f"Original request: {state['request']}\n\nDraft:\n{joined}"
-    raw = call_llm(system, user, json_mode=True, temperature=0.2)
-    critique = safe_json_parse(raw, {"needs_revision": False, "issues": []})
-
-    for t in state["task_list"]:
-        if t["title"] == "Self-critique draft":
-            t["status"] = "done"
-
+    """Validate the first assembled draft and preserve its initial critique."""
+    critique = run_reflection(state, state["draft_sections"], stage="initial")
     state["critique"] = critique
-    logger.info(f"Reflection result: {critique}")
-    return state
+    state["initial_critique"] = copy.deepcopy(critique)
 
+    for task in state["task_list"]:
+        if task["title"] == "Self-critique draft":
+            task["status"] = "done"
+
+    if not critique.get("parse_ok", True) or critique.get("needs_revision"):
+        state["status"] = STATUS_REVISING
+    else:
+        state["status"] = STATUS_VALIDATED
+
+    logger.info(
+        "Initial reflection: parse_ok=%s, needs_revision=%s, issues=%d",
+        critique.get("parse_ok"),
+        critique.get("needs_revision"),
+        len(critique.get("issues", [])),
+    )
+    return state
 
 def node_revise(state: AgentState) -> AgentState:
     """Single bounded revision pass driven by the latest critique."""
@@ -1106,6 +1111,7 @@ def _build_response_from_state(state: AgentState) -> dict:
         "review_required": review_required,
         "revision_count": state.get("revision_count", 0),
         "unresolved_issues": state.get("unresolved_issues", []),
+        "critique": state.get("critique") or {},
     }
 
 
@@ -1115,15 +1121,19 @@ def _build_response_from_state(state: AgentState) -> dict:
 
 app = FastAPI(title="DocuMind", version="3.0.0")
 
-ALLOWED_ORIGINS = os.environ.get(
-    "ALLOWED_ORIGINS",
-    "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000"
-).split(",")
+ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get(
+        "ALLOWED_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000",
+    ).split(",")
+    if origin.strip()
+]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in ALLOWED_ORIGINS if o.strip()] + ["*"],
-    allow_credentials=True,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -1151,6 +1161,7 @@ class AgentResponse(BaseModel):
     review_required: bool = False
     revision_count: int = 0
     unresolved_issues: List[dict] = Field(default_factory=list)
+    critique: dict = Field(default_factory=dict)
 
 
 @app.post("/agent", response_model=AgentResponse)
