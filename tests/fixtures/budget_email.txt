@@ -1,0 +1,38 @@
+From: Ravi Menon, Operations Lead
+To: Finance Approval Group
+Subject: Budget approval request - annual Asana Premium subscription
+
+Hi team,
+
+I would like to request approval for an annual Asana Premium subscription for
+the operations team.
+
+What we are asking for
+- Requested budget: $2,400.
+
+Why we need it
+- Our team currently tracks tasks manually across spreadsheets and chat
+  threads. Based on the last two months of logging this consumes approximately
+  12 hours per week for the team.
+- We estimate a 35% reduction in manual processing time once task tracking is
+  centralised in a single tool.
+- Asana lists Slack and Google Workspace integrations, and we already use
+  both, so adoption should be low friction.
+
+Rollout
+- The vendor has confirmed onboarding within four business days of approval.
+
+What I could not confirm
+- A vendor pricing sheet is mentioned in their proposal, but I have not
+  copied its contents into this email and I cannot vouch for the tiers.
+- I have deliberately not included a per-user subscription price or an exact
+  annual subscription total, because the figures I was given did not
+  reconcile with the $2,400 I am requesting.
+- I have not been able to establish what our loaded labour cost is, so I am
+  not attaching a savings calculation.
+
+Decision requested
+- Please approve the $2,400 budget request so we can begin onboarding.
+
+Thanks,
+Ravi

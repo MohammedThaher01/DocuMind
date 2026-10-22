@@ -17,6 +17,10 @@ build/
 # Generated documents
 generated_docs/
 
+# Test artefacts
+.pytest_cache/
+tests/benchmark_report.json
+
 # IDE
 .vscode/
 .idea/

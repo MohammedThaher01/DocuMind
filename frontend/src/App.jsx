@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 const API_BASE =
   (import.meta.env && import.meta.env.VITE_API_URL) ||
@@ -57,25 +57,216 @@ export default function App() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
 
-  const [status, setStatus] = useState(null)
+  const [jobId, setJobId] = useState(null)
+  const [status, setStatus] = useState(null) // queued | running | completed | failed
   const [taskList, setTaskList] = useState([])
   const [assumptions, setAssumptions] = useState([])
   const [docType, setDocType] = useState('')
   const [critique, setCritique] = useState(null)
-  const [result, setResult] = useState(null)
+  const [result, setResult] = useState(null) // final AgentResponse
+  const [eventLog, setEventLog] = useState([])
+
+  const esRef = useRef(null)
+
+  const resetState = () => {
+    if (esRef.current) {
+      try { esRef.current.close() } catch {}
+      esRef.current = null
+    }
+    setJobId(null)
+    setStatus(null)
+    setTaskList([])
+    setAssumptions([])
+    setDocType('')
+    setCritique(null)
+    setResult(null)
+    setEventLog([])
+    setError(null)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (esRef.current) {
+        try { esRef.current.close() } catch {}
+      }
+    }
+  }, [])
+
+  const markTasksRunning = (predicate) => {
+    setTaskList((prev) => {
+      if (!prev || !prev.length) return prev
+      let found = false
+      return prev.map((t) => {
+        if (t.status !== 'done' && !found && predicate(t)) {
+          found = true
+          return { ...t, status: 'running' }
+        }
+        return t
+      })
+    })
+  }
+
+  const connectStream = (id) => {
+    if (typeof EventSource === 'undefined') return false
+    const url = `${API_BASE}/agent/${encodeURIComponent(id)}/stream`
+    const es = new EventSource(url, { withCredentials: false })
+    esRef.current = es
+
+    es.addEventListener('queued', (e) => {
+      try {
+        const data = JSON.parse(e.data)
+        setEventLog((l) => [...l, data])
+      } catch {}
+    })
+
+    es.addEventListener('start', (e) => {
+      try {
+        const data = JSON.parse(e.data)
+        setStatus('running')
+        setEventLog((l) => [...l, data])
+      } catch {}
+    })
+
+    es.addEventListener('node', (e) => {
+      try {
+        const data = JSON.parse(e.data)
+        setEventLog((l) => [...l, data])
+        const node = data.node
+        if (node === 'plan') markTasksRunning((t) => t.title.startsWith('Classify'))
+        if (node === 'execute') markTasksRunning((t) => t.title.startsWith('Draft section'))
+        if (node === 'reflect') markTasksRunning((t) => t.title === 'Self-critique draft')
+        if (node === 'revise') markTasksRunning((t) => t.title === 'Self-critique draft')
+        if (node === 'export') markTasksRunning((t) => t.title === 'Export to DOCX')
+      } catch {}
+    })
+
+    es.addEventListener('task_list', (e) => {
+      try {
+        const { task_list } = JSON.parse(e.data)
+        setTaskList(task_list)
+      } catch {}
+    })
+
+    es.addEventListener('plan', (e) => {
+      try {
+        const data = JSON.parse(e.data)
+        setDocType(data.doc_type || '')
+        setAssumptions(data.assumptions || [])
+        setEventLog((l) => [...l, { ...data, type: 'plan' }])
+      } catch {}
+    })
+
+    es.addEventListener('critique', (e) => {
+      try {
+        const { critique } = JSON.parse(e.data)
+        setCritique(critique)
+      } catch {}
+    })
+
+    es.addEventListener('export', (e) => {
+      try {
+        const data = JSON.parse(e.data)
+        setEventLog((l) => [...l, data])
+      } catch {}
+    })
+
+    es.addEventListener('done', (e) => {
+      try {
+        const { result } = JSON.parse(e.data)
+        setStatus('completed')
+        setSubmitting(false)
+        setResult(result)
+        if (result && result.task_list && result.task_list.length) {
+          setTaskList(result.task_list)
+        }
+        if (result && result.assumptions && result.assumptions.length) {
+          setAssumptions(result.assumptions)
+        }
+        if (result && result.doc_type) {
+          setDocType(result.doc_type)
+        }
+        es.close()
+      } catch {}
+    })
+
+    es.addEventListener('error', (e) => {
+      try {
+        const data = JSON.parse(e.data)
+        if (data.error) {
+          setStatus('failed')
+          setError(data.error)
+          setSubmitting(false)
+        }
+      } catch {}
+      es.close()
+    })
+
+    es.onerror = () => {
+      es.close()
+    }
+
+    return true
+  }
+
+  const pollOnce = async (id) => {
+    try {
+      const res = await fetch(`${API_BASE}/agent/${encodeURIComponent(id)}`)
+      if (!res.ok) return
+      const job = await res.json()
+      setStatus(job.status)
+      if (job.events && job.events.length) {
+        job.events.forEach((ev) => {
+          if (ev.type === 'task_list' && ev.task_list) setTaskList(ev.task_list)
+          if (ev.type === 'plan') {
+            setDocType(ev.doc_type || '')
+            setAssumptions(ev.assumptions || [])
+          }
+          if (ev.type === 'critique') setCritique(ev.critique)
+        })
+      }
+      if (job.status === 'completed' && job.result) {
+        setResult(job.result)
+        setSubmitting(false)
+        if (job.result.task_list) setTaskList(job.result.task_list)
+      }
+      if (job.status === 'failed') {
+        setSubmitting(false)
+        setError(job.error || 'Generation failed.')
+      }
+    } catch {}
+  }
+
+  const startPollingFallback = (id) => {
+    const start = Date.now()
+    const timer = setInterval(() => {
+      pollOnce(id).finally(() => {
+        const elapsed = Date.now() - start
+        if (elapsed > 10 * 60 * 1000) clearInterval(timer)
+        getJob(id).then((j) => {
+          if (!j || j.status === 'completed' || j.status === 'failed') clearInterval(timer)
+        })
+      })
+    }, 1200)
+  }
+
+  const getJob = async (id) => {
+    try {
+      const res = await fetch(`${API_BASE}/agent/${encodeURIComponent(id)}`)
+      if (!res.ok) return null
+      return await res.json()
+    } catch { return null }
+  }
 
   const onSubmit = async (e) => {
     if (e) e.preventDefault()
     if (!request.trim() || submitting) return
 
-    setSubmitting(true)
-    setStatus('running')
-    setError(null)
-    setResult(null)
-    setTaskList([])
-    setAssumptions([])
-    setDocType('')
-    setCritique(null)
+      setSubmitting(true)
+      setError(null)
+      setResult(null)
+      setTaskList([])
+      setAssumptions([])
+      setDocType('')
 
     try {
       const res = await fetch('/agent', {
@@ -91,27 +282,31 @@ export default function App() {
 
       const data = await res.json()
 
-      setStatus('completed')
-      setResult(data)
-      setTaskList(data.task_list || [])
-      setAssumptions(data.assumptions || [])
-      setDocType(data.doc_type || '')
-      if (data.critique) setCritique(data.critique)
+        setResult(data)
+        setTaskList(data.task_list || [])
+        setAssumptions(data.assumptions || [])
+        setDocType(data.doc_type || '')
 
-      if (data.download_url) {
-        window.location.href = data.download_url
+        if (data.download_url) {
+          const link = document.createElement('a')
+          link.href = data.download_url
+          const filename = data.download_url.split('/').pop() || 'generated_document.docx'
+          link.setAttribute('download', filename)
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+        }
+        
+      } catch (err) {
+        setError(err.message || String(err))
+      } finally {
+        setSubmitting(false)
       }
-    } catch (err) {
-      setStatus('failed')
-      setError(err.message || String(err))
-    } finally {
-      setSubmitting(false)
     }
-  }
 
-  const downloadUrl = result?.download_url || ''
-  const active = submitting || Boolean(result) || taskList.length > 0 || Boolean(error)
-  const charCount = request.length
+    const downloadUrl = result?.download_url || ''
+    const active = submitting 
+    const charCount = request.length
 
   return (
     <div className="min-h-screen w-full bg-slate-950 text-slate-200 font-sans selection:bg-brand-500/30">
@@ -277,16 +472,28 @@ export default function App() {
                         Revised after self-critique
                       </span>
                     )}
+                    {result && result.review_required && (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-100 border border-rose-200 text-rose-700 text-xs font-semibold px-2.5 py-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                        Needs human review
+                      </span>
+                    )}
                   </div>
                   <h2 className="mt-3 font-bold text-xl text-slate-100">Agent execution log</h2>
                   <p className="text-sm text-slate-400 mt-1">
                     {status === 'completed'
                       ? 'All steps finished. Download the document below.'
                       : status === 'failed'
-                      ? 'Generation stopped; see the error above.'
-                      : 'Generating document and executing steps...'}
+                      ? 'Generation stopped — see the error above.'
+                      : 'Watch the agent plan, draft, self-critique, and export in real time.'}
                   </p>
                 </div>
+                {jobId && (
+                  <div className="text-right">
+                    <div className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">Job ID</div>
+                    <div className="font-mono text-xs text-slate-600 mt-0.5">{jobId.slice(0, 10)}…</div>
+                  </div>
+                )}
               </div>
 
               {taskList && taskList.length > 0 && (
@@ -351,10 +558,10 @@ export default function App() {
                       </span>
                     </div>
                     {critique.issues && critique.issues.length > 0 ? (
-                      <ul className="space-y-1.5 text-sm text-slate-300">
+                      <ul className="space-y-1.5 text-sm text-slate-700">
                         {critique.issues.map((i, idx) => (
                           <li key={idx} className="flex gap-2">
-                            <span className="text-indigo-400 shrink-0">•</span>
+                            <span className="text-indigo-500 shrink-0">•</span>
                             <span>{i}</span>
                           </li>
                         ))}
@@ -398,22 +605,69 @@ export default function App() {
                   </a>
                 </div>
 
+                {result.review_required && (
+                  <div className="mt-6 rounded-xl border border-rose-200 bg-rose-50 p-4">
+                    <div className="flex items-start gap-3">
+                      <svg viewBox="0 0 24 24" className="w-5 h-5 mt-0.5 shrink-0 text-rose-600" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                        <line x1="12" y1="9" x2="12" y2="13" />
+                        <line x1="12" y1="17" x2="12.01" y2="17" />
+                      </svg>
+                      <div className="min-w-0">
+                        <div className="font-semibold text-rose-800">
+                          Not validated — human review required
+                        </div>
+                        <p className="mt-0.5 text-sm text-rose-700">
+                          Material issues remained after {result.revision_count ?? 0} revision pass
+                          {(result.revision_count ?? 0) === 1 ? '' : 'es'}. Treat this document as a draft and
+                          resolve the following before relying on it.
+                        </p>
+                        {result.unresolved_issues && result.unresolved_issues.length > 0 && (
+                          <ul className="mt-3 space-y-1.5 text-sm text-rose-800">
+                            {result.unresolved_issues.map((issue, idx) => (
+                              <li key={idx} className="flex gap-2">
+                                <span className="shrink-0 font-semibold uppercase text-[11px] mt-0.5 rounded border border-rose-300 bg-white px-1.5 py-0.5">
+                                  {issue.severity || 'issue'}
+                                </span>
+                                <span>{issue.claim}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <dl className="mt-6 grid sm:grid-cols-3 gap-4 text-sm">
                   <div className="rounded-xl border border-slate-800/50 bg-slate-950/50 p-4">
                     <dt className="text-xs font-semibold uppercase tracking-wider text-slate-500">Sections drafted</dt>
-                    <dd className="mt-1 font-bold text-xl text-slate-100">
-                      {(result.task_list || []).filter((t) => String(t.title).startsWith('Draft section')).length}
+                    <dd className="mt-1 font-bold text-xl text-slate-900">
+                      {result.task_list.filter((t) => String(t.title).startsWith('Draft section')).length}
                     </dd>
                   </div>
                   <div className="rounded-xl border border-slate-800/50 bg-slate-950/50 p-4">
                     <dt className="text-xs font-semibold uppercase tracking-wider text-slate-500">Assumptions stated</dt>
-                    <dd className="mt-1 font-bold text-xl text-slate-100">{(result.assumptions || []).length}</dd>
+                    <dd className="mt-1 font-bold text-xl text-slate-900">{result.assumptions.length}</dd>
                   </div>
                   <div className="rounded-xl border border-slate-800/50 bg-slate-950/50 p-4">
                     <dt className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total steps</dt>
-                    <dd className="mt-1 font-bold text-xl text-slate-100">{(result.task_list || []).length}</dd>
+                    <dd className="mt-1 font-bold text-xl text-slate-900">{result.task_list.length}</dd>
                   </div>
                 </dl>
+
+                {eventLog.length > 0 && (
+                  <details className="mt-6">
+                    <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wider text-slate-500 hover:text-slate-700 select-none">
+                      Raw event stream ({eventLog.length} events)
+                    </summary>
+                    <div className="mt-3 rounded-xl bg-slate-900 text-slate-100 p-4 max-h-72 overflow-auto">
+                      <pre className="text-[11.5px] font-mono whitespace-pre-wrap break-words">
+{eventLog.map((ev) => JSON.stringify(ev)).join('\n')}
+                      </pre>
+                    </div>
+                  </details>
+                )}
               </div>
             )}
           </section>
