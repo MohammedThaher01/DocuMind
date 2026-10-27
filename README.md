@@ -1,4 +1,4 @@
-# DocuMind 📄 — Autonomous Document-Generation Agent
+# DocuMind — Autonomous Document-Generation Agent
 
 A FastAPI + LangGraph agent that takes a natural-language business request, autonomously plans the tasks needed, executes each step using Groq LLM, performs a self-reflection/critique pass, revises the content, and generates a polished .docx document. Ships with a Vite + React + Tailwind frontend and production deploy configs for Render + Vercel.
 
