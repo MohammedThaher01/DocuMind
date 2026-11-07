@@ -128,7 +128,7 @@ DocuMind deploys as a **single service on Railway** using [nixpacks.toml](nixpac
 
 > The generated `.docx` files are written to `generated_docs/`. Mount a Railway **Volume** at that path so downloads survive redeploys and restarts.
 
-> The frontend calls the API at the relative path `/agent`, so the single-service setup needs no CORS configuration. Splitting the UI onto a separate host (e.g. Vercel via the bundled `frontend/vercel.json`) is not drop-in: the relative `/agent` call would resolve against the static host, so the frontend would need a proxy/rewrite to the backend plus a matching `ALLOWED_ORIGINS` on the backend.
+> The frontend calls the API at the relative path `/agent`, so the single-service setup needs no CORS configuration. If you split the frontend onto a separate host (e.g. Vercel via the bundled `frontend/vercel.json`), set `ALLOWED_ORIGINS` on the backend to include the frontend's origin.
 
 ## Environment Variables
 
