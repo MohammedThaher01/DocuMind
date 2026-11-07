@@ -1,6 +1,8 @@
 # DocuMind — Autonomous Document-Generation Agent
 
-A FastAPI + LangGraph agent that takes a natural-language business request, autonomously plans the tasks needed, executes each step using Groq LLM, performs a self-reflection/critique pass, revises the content, and generates a polished .docx document. Ships with a Vite + React + Tailwind frontend and production deploy configs for Render + Vercel.
+A FastAPI + LangGraph agent that takes a natural-language business request, autonomously plans the tasks needed, executes each step using Groq LLM, performs a self-reflection/critique pass, revises the content, and generates a polished .docx document. Ships with a Vite + React + Tailwind frontend and a single-service Railway (Nixpacks) deploy config.
+
+**Live demo:** https://docu-mind.up.railway.app
 
 ## Features
 
@@ -8,17 +10,17 @@ A FastAPI + LangGraph agent that takes a natural-language business request, auto
 - **Section-by-Section Execution**: Generates content with focused LLM calls
 - **Self-Reflection & Revision**: Quality gate with critique and revision
 - **Polished DOCX Output**: Professional document with assumptions and execution log
-- **Live Progress UI**: React frontend with SSE-streamed task checklist, assumptions panel, self-critique panel, and one-click .docx download
+- **Live Progress UI**: React frontend showing the task checklist, assumptions panel, self-critique panel, and one-click .docx download
 
 ## Tech Stack
 
 - **FastAPI**: Web framework for the API
-- **LangGraph**: Orchestrates the agent's state and workflow (plan → execute → reflect → revise → export)
+- **LangGraph**: Orchestrates the agent's state and workflow (plan → execute → reflect → revise → revalidate → export)
 - **Groq**: LLM provider for fast inference
 - **python-docx**: Generates the final .docx documents
 - **Vite + React**: JavaScript frontend
 - **Tailwind CSS v3**: Styling (Inter font, SaaS-grade gradients)
-- **Docker + render.yaml**: One-click deploy to Render
+- **Railway (Nixpacks)**: Single-service deploy configured via `nixpacks.toml`
 
 ## Getting Started
 
@@ -66,9 +68,6 @@ cd frontend
 # Install Node dependencies
 npm install
 
-# Point Vite to the local API
-echo "VITE_API_URL=http://localhost:8000" > .env
-
 # Start the development server
 npm run dev
 
@@ -76,9 +75,9 @@ npm run dev
 
 ## Usage
 
-### Async API Endpoint: `POST /agent`
+### Endpoint: `POST /agent`
 
-Kicks off document generation asynchronously. Returns a `job_id` you can stream via SSE or poll.
+Runs the document-generation workflow synchronously — the request blocks until the graph finishes and returns the final document object. The frontend renders the task checklist, assumptions, and critique once the call returns.
 
 ```bash
 curl -X POST http://localhost:8000/agent \
@@ -86,20 +85,7 @@ curl -X POST http://localhost:8000/agent \
   -d '{"request": "Create meeting minutes for our weekly engineering standup. Attendees were Priya, Arjun and Neha. We discussed sprint progress, a bug in the payment module, and next sprint planning."}'
 ```
 
-Response:
-```json
-{
-  "job_id": "abc123def456",
-  "status_endpoint": "/agent/abc123def456",
-  "stream_endpoint": "/agent/abc123def456/stream"
-}
-```
-
-Then stream progress with EventSource on `/agent/{job_id}/stream` (emits typed events: `queued`, `start`, `node`, `task_list`, `plan`, `critique`, `export`, `done`, `error`) or poll `/agent/{job_id}`.
-
-### Legacy sync endpoint (backward compat): `POST /agent/sync`
-
-Blocks until the graph finishes and returns the final document object — useful for curl / quick testing. See [TEST REQUESTS.md](TEST%20REQUESTS.md) for two canonical test cases (simple + ambiguous).
+The response is the final document object described below. Two canonical test cases (simple + ambiguous) live in the test suite.
 
 ### Response shape (final result)
 
@@ -127,44 +113,30 @@ Blocks until the graph finishes and returns the final document object — useful
 
 ## Architecture
 
-The agent is a LangGraph state graph: `plan → execute → reflect —(if needs_revision)→ revise → export → END`. See [architecture.md](architecture.md) and [main.py](main.py).
+The agent is a LangGraph state graph: `plan → execute → reflect —(if material issues)→ revise → revalidate → export → END`. The `revalidate` node always leads to export, and a document with unresolved material issues is exported as `review_required`. See [architecture.md](architecture.md) and [main.py](main.py).
 
 ---
 
 ## Deployment
 
-### Option A — One-click on Render (recommended: both services together)
+DocuMind deploys as a **single service on Railway** using [nixpacks.toml](nixpacks.toml). Nixpacks installs the Python and Node dependencies, builds the Vite frontend into `frontend/dist`, and starts uvicorn; FastAPI then serves both the API and the built SPA from one origin.
 
 1. Push the project to GitHub.
-2. In `render.yaml`, update the two `repo:` URLs and `VITE_API_URL` / `ALLOWED_ORIGINS` placeholders to match your actual backend URL after first deploy.
-3. On Render → **Blueprints** → **New Blueprint Instance** → pick your repo.
-4. When prompted, paste your `GROQ_API_KEY` as the value for the `documind-backend → GROQ_API_KEY` env var (sync: false, enter manually).
-5. After both services deploy:
-   - Copy the frontend's `.onrender.com` URL → paste it into backend's `ALLOWED_ORIGINS` env var → redeploy backend.
-   - Copy the backend's `.onrender.com` URL → paste into frontend's `VITE_API_URL` env var → redeploy frontend.
-6. (Optional) Mount a Render persistent disk at `/app/generated_docs` in the backend service so `.docx` files survive deploys and restarts.
+2. On Railway → **New Project** → **Deploy from GitHub repo** → pick this repo. Railway auto-detects `nixpacks.toml`.
+3. Under the service's **Variables** tab, add `GROQ_API_KEY` (and optionally `GROQ_MODEL` / `ALLOWED_ORIGINS`).
+4. Railway builds and serves the app on the generated public domain. Visit `/` for the UI or `/docs` for the API.
 
-### Option B — Backend on Render, Frontend on Vercel
+> The generated `.docx` files are written to `generated_docs/`. Mount a Railway **Volume** at that path so downloads survive redeploys and restarts.
 
-**Backend (Render Docker deploy)**
-- New → Web Service → pick repo → Runtime = **Docker** → root dir = repo root.
-- Add env var `GROQ_API_KEY` = your key.
-- Add env var `ALLOWED_ORIGINS` = `https://<your-vercel-domain>.vercel.app`.
-- Build completes; service is live at `https://<name>.onrender.com`.
-
-**Frontend (Vercel)**
-- Import the repo → set **Root Directory = `frontend`** → Framework = **Vite** (auto-detected).
-- Add env var `VITE_API_URL` = `https://<your-backend>.onrender.com` (no trailing slash).
-- Deploy. `frontend/vercel.json` already contains the SPA rewrite rules.
+> The frontend calls the API at the relative path `/agent`, so the single-service setup needs no CORS configuration. Splitting the UI onto a separate host (e.g. Vercel via the bundled `frontend/vercel.json`) is not drop-in: the relative `/agent` call would resolve against the static host, so the frontend would need a proxy/rewrite to the backend plus a matching `ALLOWED_ORIGINS` on the backend.
 
 ## Environment Variables
 
 | Variable | Where | Required | Default |
 |---|---|---|---|
 | `GROQ_API_KEY` | Backend | ✅ | — |
-| `GROQ_MODEL` | Backend | ❌ | `llama-3.3-70b-versatile` |
-| `ALLOWED_ORIGINS` | Backend | ❌ (localhost friendly) | `http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,*` |
-| `VITE_API_URL` | Frontend (build-time) | ❌ for local, ✅ for deploy | `http://localhost:8000` |
+| `GROQ_MODEL` | Backend | ❌ | `llama3-70b-8192` |
+| `ALLOWED_ORIGINS` | Backend | ❌ (localhost friendly) | `http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000` |
 
 ## License
 
