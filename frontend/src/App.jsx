@@ -121,7 +121,7 @@ export default function App() {
       {/* Nav */}
       <header className="max-w-6xl mx-auto px-6 pt-8 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-500 to-indigo-500 flex items-center justify-center text-white shadow-soft">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-600 to-brand-700 flex items-center justify-center text-white shadow-soft">
             <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
               <polyline points="14 2 14 8 20 8" />
@@ -156,7 +156,7 @@ export default function App() {
           </div>
           <h1 className="font-extrabold text-4xl sm:text-5xl tracking-tight text-slate-900 leading-[1.05]">
             Describe it. DocuMind{' '}
-            <span className="bg-gradient-to-r from-brand-600 to-indigo-500 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-brand-600 to-sky-500 bg-clip-text text-transparent">
               plans, writes, critiques, and ships
             </span>{' '}
             the document.
@@ -192,7 +192,7 @@ export default function App() {
               <button
                 type="submit"
                 disabled={submitting || !request.trim()}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-brand-600 to-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-soft hover:from-brand-700 hover:to-indigo-700 disabled:opacity-60 disabled:cursor-not-allowed transition"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-brand-600 to-brand-700 px-5 py-3 text-sm font-semibold text-white shadow-soft hover:from-brand-700 hover:to-brand-800 disabled:opacity-60 disabled:cursor-not-allowed transition"
               >
                 {submitting ? (
                   <>
@@ -396,7 +396,7 @@ export default function App() {
 
             {/* Final result card */}
             {result && (
-              <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-brand-50/40 p-6 shadow-soft">
+              <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-6 shadow-soft">
                 <div className="flex flex-wrap items-start justify-between gap-5">
                   <div className="min-w-0">
                     <div className="text-xs font-semibold uppercase tracking-wider text-brand-700">

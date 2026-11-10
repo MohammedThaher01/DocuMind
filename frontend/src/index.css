@@ -12,8 +12,8 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background:
-    radial-gradient(1200px 600px at 10% -10%, rgba(168, 85, 247, 0.12), transparent 60%),
-    radial-gradient(900px 500px at 110% 10%, rgba(59, 130, 246, 0.10), transparent 60%),
-    linear-gradient(180deg, #faf9ff 0%, #ffffff 40%);
-  color: #0b0b12;
+    radial-gradient(1200px 600px at 10% -10%, rgba(90, 135, 196, 0.10), transparent 60%),
+    radial-gradient(900px 500px at 110% 10%, rgba(148, 163, 184, 0.12), transparent 60%),
+    linear-gradient(180deg, #f8fafc 0%, #ffffff 42%);
+  color: #0f172a;
 }
